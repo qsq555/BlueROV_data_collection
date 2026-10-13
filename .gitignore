@@ -1,0 +1,13 @@
+/build/
+/devel/
+/install/
+/.catkin_workspace
+/logs/
+.catkin_tools/
+*.bag
+*.bag.active
+*.bag.orig.active
+*.log
+*.py[cod]
+__pycache__/
+.env
