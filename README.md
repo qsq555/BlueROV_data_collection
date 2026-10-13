@@ -11,7 +11,7 @@
 - 相机 ROS 话题：原始图、JPEG 压缩图和未标定的 CameraInfo。
 - 压力深度换算、IMU 可视化、静态 TF 和 RViz。
 - rosbag 默认录制 MAVROS 状态/IMU/压力/RC/电池、深度、IMU 显示、压缩相机图、CameraInfo 和 TF。
-- 声呐当前默认关闭。厂家 SDK/二进制不在仓库中；需要声呐时，须另行取得可合法使用的 SDK 并配置对应 ROS 包。
+- Oculus 前视声呐支持作为可选功能随 ROS 封装提供；启动和录制默认关闭，以便无声呐时仍可运行。启用前需要声呐硬件已连接，并安装 Qt 5.14.2 运行库。
 
 本配置曾在当前工作站连接 BlueROV 时验证过 MAVROS 和相机话题。离线构建不代表目标设备的网络、视频流和飞控转发已经验证；第一次在新设备部署时按下方步骤检查。
 
@@ -33,6 +33,8 @@ Noetic 已结束上游维护，安装时 apt 软件源的可用性取决于目�
 先安装 ROS Noetic，再运行本目录的依赖脚本：
 
     ./scripts/install_dependencies_ubuntu20.sh
+
+声呐动态库依赖 Qt 5.14 ABI。请使用 Qt 安装器安装 Qt 5.14.2 的 GCC 64-bit 组件及 Qt Serial Port，默认安装路径为 `~/Qt/5.14.2/gcc_64`。安装到其他目录时，在编译和启动前设置 `export QT514_DIR=/实际路径`。ROS 封装的 CMake 会优先使用此 Qt 路径，避免误链接 Ubuntu 20.04 的 Qt 5.12。Qt 5.14.2 安装中提供相应编译配置和运行库；依赖脚本安装 ROS 及相机节点所需的软件包。
 
 构建当前采集工作区：
 
@@ -67,6 +69,8 @@ MAVROS 配置默认在本机 UDP 14560 等待 Companion 转发的 MAVLink。若�
 
 等待终端报告启动完成，并检查 RViz 中的相机和 IMU/深度显示。
 
+声呐已连接且处于水下时，编辑 `tools/start_bluerov_sensors.sh`，将 `ENABLE_SONAR=0` 改为 `ENABLE_SONAR=1`；编辑 `tools/record_bluerov_bag.sh`，将 `RECORD_SONAR=0` 改为 `RECORD_SONAR=1`。启动脚本会连接声呐、设置量程和增益，并等待声呐数据帧；随后正常运行录制脚本即可把声呐图像、量程、状态及控制回显写入 bag。声呐未连接时保持这两个开关为 0。
+
 终端二开始录制：
 
     cd BlueROV_data_collection
@@ -87,7 +91,7 @@ MAVROS 配置默认在本机 UDP 14560 等待 Companion 转发的 MAVLink。若�
 - 深度节点启动后取前 50 个压力样本的均值作为压力零点；当前流体密度配置为淡水 997 kg/m³。
 - 相机和声呐 TF 的外参目前为零；CameraInfo 只有图像尺寸，没有相机内参标定。
 - 外参尚未标定，当前话题可用于记录和检查，不应把零外参当成标定结果。
-- 声呐相关开关留在启动/录制脚本中但默认关闭。没有厂家 SDK 时不要打开 ENABLE_SONAR 或 RECORD_SONAR。
+- 声呐启动和录制开关默认关闭，避免声呐未连接时启动等待超时。按上节说明同时打开 `ENABLE_SONAR` 和 `RECORD_SONAR` 后才会采集声呐话题。
 - QGC 程序、QGC 用户配置、手柄校准值、系统镜像、录制 bag 和运行日志均未上传。每台电脑都要分别安装 QGC，并在连接 F310 后进入 Vehicle Setup → Joystick，选择活动手柄并按界面向导校准，最后检查各轴和按键。[QGC 摇杆配置说明](https://docs.qgroundcontrol.com/Stable_V4.4/en/qgc-user-guide/setup_view/joystick.html) 有完整步骤。
 
 ## 新设备检查
@@ -103,6 +107,7 @@ MAVROS 配置默认在本机 UDP 14560 等待 Companion 转发的 MAVLink。若�
 ## 文件说明
 
 - src/bluerov_sensors/：相机、压力深度和 IMU 显示 ROS 节点。
+- src/bluerov_sonar_sdk/：Oculus 声呐 ROS 封装及随项目授权提供的 SDK 文件；运行需要 Qt 5.14.2。
 - tools/start_bluerov_sensors.sh：启动和设备参数。
 - tools/record_bluerov_bag.sh：bag 话题、压缩和保存目录配置。
 - tools/bluerov_auto.rviz：RViz 配置。
