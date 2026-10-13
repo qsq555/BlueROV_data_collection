@@ -48,7 +48,18 @@ Noetic 已结束上游维护，安装时 apt 软件源的可用性取决于目�
 
 ## 网络和视频配置
 
-本机已验证的有线网络地址为 topside 电脑 192.168.2.1/24、BlueROV Companion 192.168.2.2。另一台电脑要把有线网口配置到同一网段，并在 Companion 视频配置中把目标地址改为新电脑的有线网口 IP。
+本机已验证的有线网络地址为 topside 电脑 192.168.2.1/24、BlueROV Companion 192.168.2.2。每台新电脑部署前，按下表检查需要替换的地址、端口和保存目录：
+
+| 项目 | 配置位置 | 新设备上的调整方法 |
+| --- | --- | --- |
+| topside 有线网卡 IP | Ubuntu 网络设置；`config/companion/gstreamer2.param`；Companion 相机页面 | 给电脑有线网卡配置与 Companion 同网段且未占用的地址（示例 `192.168.2.1/24`）。把视频管线两个 `clients=` 地址都改成该电脑 IP。 |
+| Companion IP | `tools/start_bluerov_sensors.sh` 的 `ROV_IP`；Companion 页面地址 | 默认是 `192.168.2.2`。如果 Companion 地址不同，修改 `ROV_IP`，并使用新地址打开相机配置页面。 |
+| ROS 视频端口 | `tools/start_bluerov_sensors.sh` 的 `CAMERA_PORT`；Companion 视频 sink | 默认 ROS 使用 UDP 5602，QGC 使用 5600。若改端口，两边必须一致；避免其他进程占用 ROS 端口。 |
+| MAVLink 转发 | `tools/start_bluerov_sensors.sh` 的 `MAVROS_FCU_URL`；Companion MAVLink 输出 | 默认本机监听 UDP 14560（`udp://:14560@`）。若更改端口或目标电脑 IP，要同步修改 Companion 的 MAVLink 转发目标。 |
+| rosbag 保存目录 | `BLUEROV_BAG_DIR` 环境变量；`tools/record_bluerov_bag.sh` | 默认 `~/bluerov_bag`。可按下文示例设置到数据盘。 |
+| Qt 安装目录 | `QT514_DIR` 环境变量 | 默认 `~/Qt/5.14.2/gcc_64`；Qt 安装在其他位置时，在编译及运行前设置为实际目录。 |
+
+相机和声呐外参目前是零值，尚未标定；只有获得实测外参后才修改启动脚本中的 `CAMERA_TF_*` 和 `SONAR_TF_*`。
 
 在 Companion 相机页面 http://192.168.2.2:2770/camera 中保留现有编码管线，只把原先发往 QGC 的 RTP sink 改为向两个 UDP 端口发送：
 
@@ -56,7 +67,29 @@ Noetic 已结束上游维护，安装时 apt 软件源的可用性取决于目�
 
 仓库中的 config/companion/gstreamer2.param 有这段设置。将其中的 192.168.2.1 替换为目标电脑地址，保存后重启 Companion 视频流。QGC 使用 5600，ROS 节点使用 5602；不要让另一个视频接收进程占用 5602。
 
-MAVROS 配置默认在本机 UDP 14560 等待 Companion 转发的 MAVLink。若目标设备使用不同的转发地址或端口，修改 tools/start_bluerov_sensors.sh 顶部 MAVROS_FCU_URL 和 Companion 的 MAVLink 输出设置，使两者匹配。启动前确认 QGC 可以连接飞控。Ubuntu 20.04 上请使用 QGC 4.4 系列；本仓库不分发 QGC 二进制。按 [QGC 4.4 安装说明](https://docs.qgroundcontrol.com/v4.4.3/en/qgc-user-guide/getting_started/download_and_install.html) 从官方页面取得 AppImage。
+MAVROS 配置默认在本机 UDP 14560 等待 Companion 转发的 MAVLink。若目标设备使用不同的转发地址或端口，按上表同步修改 `MAVROS_FCU_URL` 和 Companion 的 MAVLink 输出设置。
+
+## 安装 QGC 与校准摇杆
+
+本仓库不包含 QGC 程序和每台电脑的 QGC 用户配置。Ubuntu 20.04 x86_64 建议使用 QGC 4.4.3 AppImage。按 [QGC 官方 Ubuntu 安装教程](https://docs.qgroundcontrol.com/v4.4.3/en/qgc-user-guide/getting_started/download_and_install.html) 下载；可按以下步骤安装运行：
+
+1. 安装视频和 AppImage 运行依赖：
+
+       sudo apt install gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-gl libqt5gui5 libfuse2 -y
+
+2. 从上述官方页面下载 `QGroundControl.AppImage`，在下载目录运行：
+
+       chmod +x QGroundControl.AppImage
+       ./QGroundControl.AppImage
+
+3. 官方 Linux 安装步骤还建议把当前用户加入 `dialout` 组并移除 `modemmanager`，以支持直接使用串口连接飞控：
+
+       sudo usermod -a -G dialout "$USER"
+       sudo apt-get remove modemmanager -y
+
+   完成后注销并重新登录。当前工作流通过以太网从 Companion 接收 MAVLink；只有电脑需要直接连接 USB/串口飞控时才需要这些串口配置。
+
+4. 如需使用 Logitech F310，先连接手柄并在 QGC 中连接飞控，打开 **Vehicle Setup → Joystick**，选择活动手柄并按校准向导完成轴和按键校准。确认各轴方向正确后再操作飞行器；校准保存在本机，不随仓库共享。详见 [QGC 官方摇杆设置教程](https://docs.qgroundcontrol.com/Stable_V4.4/en/qgc-user-guide/setup_view/joystick.html)。
 
 ## 启动和录制
 
